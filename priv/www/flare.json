@@ -1,0 +1,15 @@
+{
+    "name": "industry",
+    "path": "/api/industry/",
+    "children": [
+	{"name": "tt_account : factory",
+	 "path" : "/flare.json"
+	},
+	{"name": "tt_organization : factory", 
+	 "path" : "/flare.json"
+	},
+	{"name": "tt_resource : factory",
+	 "path" : "/flare.json"
+	}
+    ]
+}

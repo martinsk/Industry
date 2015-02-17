@@ -1,0 +1,31 @@
+{application, industry,
+ [
+  {description, "The industry factory conglomerate"},
+  {vsn, "0.BUILD_NUM"},
+  {id, "industry"},
+  {modules,      []},
+  {registered,
+   [
+    industry_sup
+   ]},
+  {applications,
+   [
+    kernel,
+    stdlib,
+    sasl,
+    lager,
+    ssl,
+    crypto,
+    inets
+   ]},
+   {indluded_applications, [
+     ranch,
+     cowlib,
+     cowboy
+    
+   ]},
+  {env, []},
+  {mod, {industry_app, []}},
+  {included_applications, []}
+ ]
+}.
