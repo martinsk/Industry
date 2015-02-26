@@ -13,7 +13,8 @@
 -export([start_link/0]).
 
 -export([get_state/0,
-	add_factory/1]).
+	 add_factory/1,
+	 add_factories/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -31,7 +32,11 @@ get_state() ->
     gen_server:call(?SERVER, get_state).
 
 add_factory(Schema) ->
-    gen_server:call(?SERVER, {add_factory, Schema}).
+    [Resp] = gen_server:call(?SERVER, {add_factories, [Schema]}),
+    Resp.
+
+add_factories(Schemas) ->
+    gen_server:call(?SERVER, {add_factories, Schemas}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -93,18 +98,16 @@ init([]) ->
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, Reply, State} |
 %%                                   {stop, Reason, State}
-handle_call({add_factory, Schema}, _From, State) ->
-    Name = proplists:get_value(name, Schema),
-    Factories = State#state.factories,
-    case sets:is_element(Name, Factories) of
-	false -> 
-	    factory:start(Schema),
-	    NewFactories = sets:add_element(Name,Factories),
-	    NewState = State#state{factories = NewFactories},
-	    {reply, ok, NewState};
-	true -> 
-	    {reply, {error, "factory exists"}, State}
-    end;
+handle_call({add_factories, Schemas}, _From, State) ->
+    CompiledSchemas = i:compile_schemas(Schemas),
+
+    lager:warning("COMPILED SCHEMAS ~p", [CompiledSchemas]), 
+    {Replies, NewFactories} = 
+	lists:foldl(fun(Schema,{Repls,Facs}) ->
+			    {Reply, NewFacs} = create_factory(Schema, Facs),
+			    {[Reply | Repls], NewFacs}
+		    end, {[], State#state.factories}, CompiledSchemas),
+    {reply, Replies, State#state{factories = NewFactories}};
 handle_call(get_state, _From, State) ->
     RetState = [{factories, sets:to_list(State#state.factories)}],
     {reply, RetState, State};
@@ -165,3 +168,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+
+create_factory(Schema, Factories) ->
+    Name = i:get(name, Schema),
+    Type = i:get(name, Schema),
+    case sets:is_element(Name, Factories) of
+	false -> 
+	    factory:start(Schema),
+	    NewFactories = sets:add_element(Name,Factories),
+	    {ok, NewFactories};
+	true -> 
+	    {{error_exits, Type}, Factories}
+    end.

@@ -30,6 +30,7 @@ content_types_provided(Req, State) ->
 
 to_json(Req, State) ->
     IndustryState = industry:get_state(),
+    lager:warning("STATE FOR PRINTING ~p ", [IndustryState]),
     EJson = state_to_ejson(IndustryState),
     Body = jiffy:encode(EJson),
     {Body, Req, State}.
@@ -50,7 +51,7 @@ normalize_value(Values, {list, Type}) ->
 		      normalize_value(Value, Type)
 	      end, Values);
 normalize_value(Value, string) ->
-    Value.
+    {[{name, list_to_binary(Value)}]}.
 
 
     

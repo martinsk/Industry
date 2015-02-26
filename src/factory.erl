@@ -47,8 +47,11 @@ start(Schema)->
 
 
 create(Type, Props) ->
-    {ok, Id} = call(Type, {create, Props}),
-    {Id, Type}.
+    case call(Type, {create, Props}) of
+	{ok, Id}-> 
+	    {Id, Type};
+	Else -> Else
+    end.
 
 stop_workers(Type) ->
     call(Type, stop_workers).
@@ -85,8 +88,11 @@ lookup({Id, Type}) ->
 %%                     ignore |
 %%                     {stop, Reason}
 init([Schema]) ->
-    Type = proplists:get_value(type, Schema),
+    lager:warning("init factory"),
+    Type = i:get(type, Schema),
     TRef = ets_new(Type),
+    {A, B, C} = now(),
+    random:seed(A,B,C),
     State = #state{table = TRef, schema = Schema},
     {ok, State}.
 
@@ -105,7 +111,7 @@ init([Schema]) ->
 %%                                   {stop, Reason, Reply, State} |
 %%                                   {stop, Reason, State}
 handle_call(stop_workers, _From, State) ->
-    Type = proplists:get_value(type, State#state.schema),
+    Type = i:get(type, State#state.schema),
     TableName = list_to_existing_atom(ets_tname(Type)),
     Workers = ets:tab2list(TableName),
     lists:foreach(fun({Id, _Pid}) ->
@@ -118,17 +124,31 @@ handle_call({load, Id}, _From, State) ->
     lager:warning("attempting to load ~p", [Id]),
     {reply, ok, State};
 handle_call({create, Props}, _From, State) ->
-    %% generate Id
-    Id = random:uniform(100000000),
+    Type = i:get(type, State#state.schema),
+    InitProps = case i:get(id, Props) of
+		    undefined ->
+			Id = random:uniform(100000000),
+			[{id, Id} | Props];
+		    Id -> 
+			Props
+		end,
     Schema = State#state.schema,
-
-    {ok, Pid} = factory_worker:new(Schema, [{id, Id} | Props]),
     
-    %% store in ets for lookup
-    Name = proplists:get_value(type, Schema),
-    true = ets_insert(Name, {Id, Pid}),
+    case ets_lookup(Id, Type) of
+	[] ->
+	    lager:warning("creating ~p", [Props] ), 
+	    {ok, Pid} = factory_worker:new(Schema, InitProps),
+	    
+	    %% store in ets for lookup
+	    Name = proplists:get_value(type, Schema),
+	    true = ets_insert(Name, {Id, Pid}),
+	    
+	    {reply, {ok,Id}, State};
+	[{Id, Pid}] ->
 
-    {reply, {ok,Id}, State};
+	    lager:warning("Found ~p ~p",[Type,Id]), 
+	    {reply, {error_existt}, State}
+    end; 
 handle_call(_Request, _From, State) ->
     
     Reply = ok,
@@ -200,7 +220,7 @@ ets_tname(Type) ->
 
 ets_new(Type) ->
     TName = ets_tname(Type),
-    ets:new(list_to_atom(TName), [set, named_table]).
+    ets:new(list_to_atom(TName), [set, named_table, {read_concurrency, true}, {write_concurrency, false}]).
 
 ets_insert(Type, {Id,Pid}) ->
     TName = ets_tname(Type),
