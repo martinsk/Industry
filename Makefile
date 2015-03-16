@@ -1,14 +1,39 @@
-PROJECT = industry
-COMPILE_FIRST=industry.erl factory.erl factory_worker.erl
-# Compile flags
-ERLC_COMPILE_OPTS= +'{parse_transform, lager_transform}'
+.PHONY: test deps
 
-ERLC_OPTS += $(ERLC_COMPILE_OPTS)
-TEST_ERLC_OPTS += $(ERLC_COMPILE_OPTS)
+industry:
+	./rebar compile
+deps:
+	./rebar get-deps
+test:
+	./rebar eunit skip_deps=true
 
-DEPS = cowboy jiffy lager eper rafter seestar
+APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
+	xmerl webtool eunit syntax_tools compiler
+PLT = $(HOME)/.industry_dialyzer_plt
 
-dep_rafter = git https://github.com/martinsk/rafter master
-dep_seestar = git https://github.com/iamaleksey/seestar  master
+check_plt: 
+	dialyzer --check_plt --plt $(PLT) --apps $(APPS)
 
-include erlang.mk
+build_plt: 
+	dialyzer --build_plt --output_plt $(PLT) --apps $(APPS)
+
+dialyzer: 
+	@echo
+	@echo Use "'make check_plt'" to check PLT prior to using this target.
+	@echo Use "'make build_plt'" to build PLT prior to using this target.
+	@echo
+	@sleep 1
+	dialyzer -Wno_return -Wunmatched_returns -Wrace_conditions \
+		--plt $(PLT) deps/*/ebin ebin | \
+	    tee .dialyzer.raw-output
+
+cleanplt:
+	@echo
+	@echo "Are you sure?  It takes about 1/2 hour to re-build."
+	@echo Deleting $(PLT) in 5 seconds.
+	@echo
+	sleep 5
+	rm $(PLT)
+
+xref: compile
+	./rebar xref skip_deps=true | grep -v unused | egrep -v -f ./xref.ignore-warnings

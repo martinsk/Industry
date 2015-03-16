@@ -27,9 +27,10 @@ schema() ->
 		   {resource  , i:ref(resource)},
 		   {owner     , i:ref(account)}
 		  ]},
-     {options, [{on_create, {db_worker, insert}},
-		{on_change, {db_worker, update}},
-		{on_delete, {db_worker, delete}}]},
+     {options, [{on_create, [{db_worker, insert}]},
+		{on_load,   [{db_worker, select}]},
+		{on_change, [{db_worker, update}]},
+		{on_delete, [{db_worker, delete}]}]},
      {timeout, timer:seconds(10)},
      {module, ?MODULE}].
 

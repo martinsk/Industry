@@ -28,10 +28,11 @@ schema() ->
 		   {id      , i:integer()},
 		   {members , i:set(i:ref(account))}
 		  ]},
-     {options, [{on_create, {db_worker, insert}},
-		{on_change, {db_worker, update}},
-		{on_delete, {db_worker, delete}}]},
-     {timeout, timer:seconds(10)},
+     {options, [{on_create, [{db_worker, insert}]},
+		{on_load,   [{db_worker, select}]},
+		{on_change, [{db_worker, update}]},
+		{on_delete, [{db_worker, delete}]}]},
+     {timeout, timer:seconds(1)},
      {module, ?MODULE}].
 
 -spec new(term()) -> {ok, factory_worker:worker_state()}.

@@ -20,7 +20,8 @@
 	 ref/1,
 	 pid/0,
 	 option/1,
-	 enum/1
+	 enum/1,
+	 node/2
 	]).
 
 
@@ -39,6 +40,10 @@
 	 compile_schemas/1
     	]).
 
+-export([
+	 parse_tree_schema/1
+	]).
+
 
 uid()        -> uid.
 pid()        -> pid.
@@ -53,6 +58,9 @@ queue(Of)    -> {queue, Of}.
 ref(Of)      -> {ref, Of}.
 option(Types) -> {option, Types}.
 enum(Options) -> {enum, Options}.
+
+
+node(Name, Children)      -> {node, Name, Children}.
 
 
 get(Key, State) when is_atom(Key) ->
@@ -138,3 +146,140 @@ compile_schema_attribute_type({ref, Of},  Env) -> i:get([Of, attributes, id], En
 compile_schema_attribute_type({set, Of},  Env) -> {set, compile_schema_attribute_type(Of, Env)}. 
     
 
+syntax_check_tree_schema(Schema, Env) ->
+    Nodes = i:get(nodes, Schema),
+    lists:all(fun(Node) -> syntax_check_node_schema(Node, Env) end, Nodes). 
+
+syntax_check_node_schema({node, Name, Args}, Env) when is_atom(Name) ->
+    syntax_check_node_args(Args, Env).
+
+
+syntax_check_node_args(Args, Env) ->
+    lists:all(fun(Arg) -> syntax_check_node_arg(Arg, Env) end, Args). 
+
+syntax_check_node_arg_list({ref, Of}, Env) -> lists:member(Of, Env); 
+syntax_check_node_arg_list(string, _Env) -> true;
+syntax_check_node_arg_list(int, _Env) -> true;
+syntax_check_node_arg_list(_, _Env) -> false. 
+					      
+
+    
+syntax_check_node_arg(string, _Env) -> true;
+syntax_check_node_arg({list, Of}, Env) ->  syntax_check_node_arg_list(Of, Env);
+syntax_check_node_arg(Type, _Env) -> 
+    lager:warning("unimplemented Type in args ~p ", [Type]),
+    false.
+    
+
+parse_tree_schema(Grammar) ->
+    Root = i:get(root, Grammar),
+    Env = [i:get(name, Rule) || Rule <- i:get(rules, Grammar)],
+    true = lists:all(fun(Rule) ->
+			     syntax_check_tree_schema(Rule, Env) 
+		     end, i:get(rules, Grammar) ),
+    
+    Term = {'or', [{'memberof', "Somethign"},
+		   {'and', [{present, "shizzle"}]}
+		  ]},
+    true = in_language(Term, Grammar),
+    Schema = translate_into_schema('filter', Grammar).
+
+in_language(String, Grammar) ->
+    Root = i:get(root, Grammar),
+    Rules = i:get(rules, Grammar),
+    [RootRule] = [Rule ||Rule <- Rules, Root =:= i:get(name, Rule)],
+    valid_term(String, RootRule, Rules).
+
+
+valid_term(Tuple, Type, Rules) when is_tuple(Tuple) -> 
+    valid_term(tuple_to_list(Tuple), Type, Rules);
+valid_term(Str, string, Rules) -> 
+    true;
+valid_term(Term, {ref, Type}, Rules) ->
+    [NewRule] = [Rule ||Rule <- Rules, Type =:= i:get(name, Rule)],
+    valid_term(Term, NewRule, Rules);    
+valid_term(Terms, {list, Type}, Rules) -> 
+    lists:all(fun(Term) -> 
+		      valid_term(Term, Type, Rules)
+	      end, Terms);
+valid_term([Name | Args] , Rule, Rules) ->
+    lists:any(fun({node, Name1, Types}) ->
+		      Name1 =:= Name 
+			  andalso   lists:all(fun({Arg, Type}) ->
+						      valid_term(Arg, Type, Rules)
+					      end, lists:zip(Args,Types))
+	      end, i:get(nodes, Rule)).
+
+
+
+
+translate_arg_types({ref, Of}, Grammar, Name) ->
+    Env = [i:get(name,Rule) || Rule <- i:get(rules, Grammar)],
+    case lists:member(Of, Env) of
+	true ->
+	    {ref, Name};
+	false ->
+	    {ref, Of}
+    end;
+translate_arg_types({list, Of}, Grammar, Name) ->
+    {list, translate_arg_types(Of, Grammar, Name)};
+translate_arg_types(Other, _Grammar, _Name) ->
+    Other.
+
+
+
+	
+
+translate_rule_node_into_attributes({node, Transition, ArgTypes}, Rule, Grammar, Name) ->
+    RuleName = i:get(name, Rule),
+    RuleNameStr = atom_to_list(RuleName),
+    TrName = atom_to_list(Transition),
+    lists:map(fun({ArgType, Int}) ->
+		      IntStr = lists:flatten(io_lib:format("~p", [Int])),
+		      AttributeName = list_to_atom("_" ++ RuleNameStr
+						   ++ "_" ++ TrName ++ "_" ++ IntStr),
+		      {AttributeName, translate_arg_types(ArgType, Grammar, Name)}
+	      end, lists:zip(ArgTypes, lists:seq(0,length(ArgTypes) -1))).
+	
+
+translate_rule_into_attributes(Rule, Grammar, Name) ->
+    lists:append(
+      lists:map(fun(Node) ->
+			translate_rule_node_into_attributes(Node, Rule, Grammar, Name)
+		end, i:get(nodes, Rule))).
+    
+
+    
+translate_into_schema(Name, Grammar) ->
+    TypeName = list_to_atom("grammar_" ++ atom_to_list(Name)),
+    Expected = [{type, grammar_filter},
+		{attributes, [
+			      {id,                  i:integer()},
+			      {rules,               i:enum([filter])},
+			      {'_filter',           i:enum(['or', 'and', 'present', 'memberof'])},
+			      {'_filter_or_0',       i:list(i:ref(grammer_filter))},
+			      {'_filter_and_0',      i:list(i:ref(grammer_filter))},
+			      {'_filter_present_0',  i:string()},
+			      {'_filter_memberof_0', i:string()}
+			     ]}],
+    
+    RuleNames = {rules, i:enum([i:get(name,Rule) || Rule <- i:get(rules, Grammar)])},
+    RulesTransitions = lists:map (fun(Rule) ->
+					  RuleName = i:get(name, Rule),
+					  TName = [ TransitionName 
+						      || {node, TransitionName, _Args} <- i:get(nodes, Rule)],
+					  {list_to_atom("_" ++ atom_to_list(RuleName)), i:enum(TName)}
+				  end, i:get(rules, Grammar)),
+    
+    ArgumentAttrbs = lists:append(
+		       lists:map(fun(Rule) ->
+					 translate_rule_into_attributes(Rule, Grammar, TypeName)
+				 end, i:get(rules, Grammar))
+		      ),
+    
+    Ret = [{type, TypeName},
+	   {attributes, [{id, i:integer()}, RuleNames]
+	    ++ RulesTransitions ++ ArgumentAttrbs}],
+    io:format("~p~n", [Ret]),
+    
+    io:format("~p~n", [Expected]).

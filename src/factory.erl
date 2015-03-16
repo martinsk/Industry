@@ -14,7 +14,10 @@
 
 -export([create/2, 
 	 lookup/1,
-	 stop_workers/1]).
+	 unregister/2,
+	 stop_workers/1,
+	 get_state/1
+	]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -60,7 +63,12 @@ stop_workers(Type) ->
 lookup({Id, Type}) ->
     lookup({Id, Type}, 3).
 
+unregister({Type, Id}, Pid) -> 
+    ets_remove(Type, {Id,Pid}).
 
+
+get_state(Type) -> 
+    call(Type, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -120,8 +128,15 @@ handle_call(stop_workers, _From, State) ->
 		  end, Workers),
     {reply, ok, State};
 handle_call({load, Id}, _From, State) ->
-    %%load from db
-    lager:warning("attempting to load ~p", [Id]),
+    Type = i:get(type, State#state.schema),
+    ok = case ets_lookup(Id, Type) of
+	     [{Id, _Pid}] ->  
+		 ok;
+	     [] ->
+		 {ok, Pid} =  factory_worker:load(State#state.schema, Id),
+		 true = ets_insert(Type, {Id, Pid}),
+		 ok
+	 end,		
     {reply, ok, State};
 handle_call({create, Props}, _From, State) ->
     Type = i:get(type, State#state.schema),
@@ -140,17 +155,20 @@ handle_call({create, Props}, _From, State) ->
 	    {ok, Pid} = factory_worker:new(Schema, InitProps),
 	    
 	    %% store in ets for lookup
-	    Name = proplists:get_value(type, Schema),
-	    true = ets_insert(Name, {Id, Pid}),
+	    true = ets_insert(Type, {Id, Pid}),
 	    
 	    {reply, {ok,Id}, State};
-	[{Id, Pid}] ->
+	[{Id, _Pid}] ->
 
 	    lager:warning("Found ~p ~p",[Type,Id]), 
 	    {reply, {error_existt}, State}
     end; 
+handle_call(get_state, _From, State) ->
+    Name = i:get(name, State#state.schema),
+    Workers = [Id || {Id, _Pid} <- dict:to_list(State#state.workers)],
+    Reply = [{name, {Name, string}}, [workers, {Workers, {list, string}}]],
+    {reply, Reply, State};
 handle_call(_Request, _From, State) ->
-    
     Reply = ok,
     {reply, Reply, State}.
 
@@ -220,11 +238,16 @@ ets_tname(Type) ->
 
 ets_new(Type) ->
     TName = ets_tname(Type),
-    ets:new(list_to_atom(TName), [set, named_table, {read_concurrency, true}, {write_concurrency, false}]).
+    ets:new(list_to_atom(TName), [set, named_table, {read_concurrency, true}, {write_concurrency, false}, public]).
 
 ets_insert(Type, {Id,Pid}) ->
     TName = ets_tname(Type),
     true = ets:insert(list_to_existing_atom(TName), {Id, Pid}).
+
+ets_remove(Type, {Id,Pid}) ->
+    TName = ets_tname(Type),
+    true = ets:delete_object(list_to_existing_atom(TName), {Id, Pid}).
+    
     
 ets_lookup(Id, Type)->
     TName = ets_tname(Type),

@@ -10,7 +10,7 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1]).
+-export([start/0, start/2, stop/1]).
 
 %%%===================================================================
 %%% Application callbacks
@@ -21,10 +21,16 @@
 %%                                      {error, Reason}
 %%      StartType = normal | {takeover, Node} | {failover, Node}
 %%      StartArgs = term()
+start() ->  application:start(industry).
+
 start(_StartType, _StartArgs) ->
-    application:start(ranch),
-    application:start(cowlib),
-    application:start(cowboy),
+    lager:warning("Starting App"),
+
+    ok = application:start(ranch),
+    ok = application:start(cowlib),
+    ok = application:start(cowboy),
+    ok = application:start(druuid),
+    ok = application:start(rafter),
     
     case industry_sup:start_link() of
 	{ok, Pid} -> {ok, Pid};

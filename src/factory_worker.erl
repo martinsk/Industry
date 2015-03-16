@@ -12,6 +12,7 @@
 %% API
 
 -export([new/2,
+	 load/2,
 	 call/2,
 	 cast/2,
 	 stop/1]).
@@ -30,7 +31,8 @@
 	  module         = undefined   :: atom(),
 	  schema         = []          :: term(),
 	  instance_state = []          :: proplists:proplist(),
-	  timeout        = never       :: pos_integer() | never
+	  timeout        = never       :: pos_integer() | never,
+	  run_state      = running     :: running | stopping
 	 }).
 
 
@@ -55,6 +57,10 @@
 
 new(Schema, State) ->
     gen_server:start_link(factory_worker, [new, State, Schema], []).
+
+
+load(Schema, Id) ->
+    gen_server:start_link(factory_worker, [load, Id, Schema], []).
 
 stop({Id, Type}) ->
     cast_internal({Id, Type}, stop).
@@ -96,11 +102,35 @@ init([new, Props, Schema]) ->
     
     ok = case i:get(on_create, Options) of
 	     undefined  -> ok;
-	     {Mod, Fun} -> 
+	     Opts ->
 		 Id = i:get(id, NewInstanceState),
-		 Mod:Fun(Schema,Id, NewInstanceState)
+		 lists:foreach(fun({Mod,Fun}) ->
+				       Mod:Fun(Schema,Id, NewInstanceState)
+			       end, Opts)
 	 end,
+    
+    State = #state{module = Module, 
+		   schema = Schema,
+		   instance_state = cleanup_state(InstanceState, Schema),
+		   timeout = Timeout},
+    case Timeout of
+	never ->
+	    {ok, State};
+	Timeout ->
+	    {ok, State, Timeout}
+    end;
+init([load, Id, Schema]) ->
+    Module  = i:get(module,  Schema),
+    Options = i:get(options, Schema),
+    Type    = i:get(type,    Schema),
+    Timeout = i:get(timeout, Schema),
+    
 
+    Props = case i:get(on_load, Options) of
+	[{Mod,Fun}] ->  Mod:Fun(Schema, Id)
+    end,
+	    
+    {ok, InstanceState}    = Module:loaded(Props),
     State = #state{module = Module, 
 		   schema = Schema,
 		   instance_state = cleanup_state(InstanceState, Schema),
@@ -111,6 +141,8 @@ init([new, Props, Schema]) ->
 	Timeout ->
 	    {ok, State, Timeout}
     end.
+
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -125,6 +157,14 @@ init([new, Props, Schema]) ->
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, Reply, State} |
 %%                                   {stop, Reason, State}
+handle_call(Req, From, State = #state{run_state      = shutdown,
+				      instance_state = InstanceState,
+				      schema         = Schema,
+				      timeout        = Timeout}) ->
+    Type    = i:get(type,    Schema),
+    Id      = i:get(id,      InstanceState), 
+    Reply = call({Type, Id}, Req),
+    finalize(reply, Reply, State, Timeout);
 handle_call({req, Request}, From, #state{instance_state = InstanceState,
 					 schema         = Schema,
 					 module         = Module,
@@ -143,6 +183,14 @@ handle_call({req, Request}, From, #state{instance_state = InstanceState,
 %% @spec handle_cast(Msg, State) -> {noreply, State} |
 %%                                  {noreply, State, Timeout} |
 %%                                  {stop, Reason, State}
+handle_cast(Req, State = #state{instance_state = InstanceState,
+			     schema         = Schema,
+			     run_state      = shutdown,
+			     timeout        = Timeout}) ->
+    Type    = i:get(type,    Schema),
+    Id      = i:get(id,      InstanceState), 
+    cast({Type, Id}, Req),
+    finalize(noreply, State, Timeout);
 handle_cast({req,Msg}, #state{instance_state = InstanceState, 
 			      schema         = Schema, 
 			      module         = Module,
@@ -163,7 +211,15 @@ handle_cast({internal, stop}, State) ->
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, State}
-handle_info(timeout, State) ->
+handle_info(timeout, State = #state{run_state = running,
+				 instance_state = InstanceState,
+				 timeout = Timeout,
+				 schema = Schema}) ->
+    Id   = i:get(id, InstanceState),
+    Type = i:get(type, Schema),
+    factory:unregister({Type, Id}, self()),
+    {noreply, State#state{run_state = shutdown}, Timeout};
+handle_info(timeout, State = #state{run_state = shutdown}) ->
     {stop, normal, State};
 handle_info(Info, #state{instance_state = InstanceState, 
 			 schema         = Schema, 
@@ -181,7 +237,6 @@ handle_info(Info, #state{instance_state = InstanceState,
 %%--------------------------------------------------------------------
 %% @spec terminate(Reason, State) -> void()
 terminate(normal, _State) ->
-%%    lager:info("Shutting down ~p", [self()]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -204,8 +259,6 @@ cleanup_state(State, Schema) ->
     Attributes = [Attr || {Attr, Type} <- i:get(attributes, Schema)],
     [{Attr, i:get(Attr, State)} || Attr <- Attributes].
 
-
-
 handle_state_change(Schema, OldState, NewState) ->
     Diff = i:state_diff(Schema, OldState, NewState),
     case Diff of 
@@ -217,17 +270,16 @@ handle_state_change(Schema, OldState, NewState) ->
 	    Id      = i:get(id,      OldState), 
 	    case i:get(on_change, Options) of
 		undefined -> ok;
-		{Mod,Fun} ->  
-		    Mod:Fun(Schema, Id, Diff)
+		Opts ->
+		    lists:foreach(fun({Mod,Fun}) ->
+					  Mod:Fun(Schema, Id, Diff)
+				  end, Opts)
 	    end
     end.
-
 
 cast_internal({Id, Type}, Request) ->
     {ok, Pid} = factory:lookup({Id, Type}),
     gen_server:cast(Pid, {internal, Request}).
-
-
 
 finalize(noreply, State, never)         -> {noreply, State};
 finalize(noreply, State, Timeout)      -> {noreply, State, Timeout}.

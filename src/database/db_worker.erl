@@ -97,6 +97,27 @@ handle_call({insert, Schema, _Id, Values}, _From, State) ->
     
     {ok, _} = seestar_session:execute(Pid, QryID, Types, Row, one),
     {reply, ok, State};
+handle_call({select, Schema, Id}, _From, State) ->
+    Type      = i:get(type,      Schema),
+    NameSpace = i:get(namespace, State),
+    Pid       = i:get(pid,       State),
+
+    Attributes = i:get(attributes, Schema),
+
+    Query = [ "SELECT ", string:join([ io_lib:format("~p", [K]) 
+				       || {K,_} <- Attributes], ","),
+	      " FROM ", io_lib:format("~s.~p", [NameSpace, Type]),
+	      "  WHERE id=", i:render(Id, i:get([attributes, id], Schema))],
+    lager:warning("Query : ~p ", [lists:flatten(Query)]),
+    {ok, Rows} = seestar_session:perform(Pid, lists:flatten(Query), one),
+    Result = case seestar_result:rows(Rows) of
+		 [Row] ->
+		     format_select_results(Row, Schema);
+		 [] ->
+		     not_found
+	     end,
+    lager:warning("RESULT ~p", [Result]),
+    {reply, Result, State}; 
 handle_call({update, Schema, Id, Values}, _From, State) ->
     Type      = i:get(type,      Schema),
     NameSpace = i:get(namespace, State),
@@ -163,7 +184,20 @@ create_table_impl(Schema, Env, State) ->
     lager:warning("Query : ~s", [lists:flatten(Query)]), 
     Resp = seestar_session:perform(Pid, lists:flatten(Query), one).
 
-    
 
+format_select_results(Row, Schema) -> 
+    Tuples = lists:zip(Row, i:get(attributes, Schema)),
+    [{Name, format_element(Value, Type)} || {Value, {Name, Type}} <- Tuples].
 
-
+format_element(Value, integer) ->
+    Value;
+format_element(Value,  string) ->
+    binary_to_list(Value);
+format_element(null, {set, Of}) ->
+    sets:new();
+format_element(Values, {set, Of}) ->
+    sets:from_list(lists:map(fun(Value) ->
+		      format_element(Value, Of)
+	      end, sets:to_list(Values)));
+format_element(null,  {list, Of}) ->
+    [].
