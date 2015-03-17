@@ -9,8 +9,7 @@
                   kernel,
                   stdlib,
 		  sasl,
-    		  lager,
-    		  inets
+    		  lager
                  ]},
   {mod, { industry_app, []}},
   {env, []}
