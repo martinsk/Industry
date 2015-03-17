@@ -10,7 +10,9 @@
 -export([
 	 uid/0,
 	 string/0,
+	 ejson/0,
 	 integer/0,
+	 boolean/0,
 	 pos_integer/0,
 	 password/0,
 	 set/1,
@@ -45,17 +47,19 @@
 	]).
 
 
-uid()        -> uid.
-pid()        -> pid.
-string()     -> string.
-integer()    -> integer.
-pos_integer()-> integer.
-password()   -> password.
-set(Of)      -> {set, Of}.
-pair(E1, E2) -> {pair, E1, E2}.
-list(Of)     -> {list, Of}.
-queue(Of)    -> {queue, Of}.
-ref(Of)      -> {ref, Of}.
+uid()         -> uid.
+pid()         -> pid.
+string()      -> string.
+integer()     -> integer.
+boolean()     -> boolean.
+ejson()       -> ejson.
+pos_integer() -> integer.
+password()    -> password.
+set(Of)       -> {set, Of}.
+pair(E1, E2)  -> {pair, E1, E2}.
+list(Of)      -> {list, Of}.
+queue(Of)     -> {queue, Of}.
+ref(Of)       -> {ref, Of}.
 option(Types) -> {option, Types}.
 enum(Options) -> {enum, Options}.
 
@@ -82,14 +86,12 @@ state_diff(Schema, OldState, NewState)->
     Old = [ {K, i:get(K, OldState)} || K <- Attributes],
     New = [ {K, i:get(K, NewState)} || K <- Attributes],
     {_,Diff} = lists:unzip(
-		 lists:filter(fun({X,X})         -> false;
-				 ({{K,X},{K,Y}}) -> true
-			      end, lists:zip(Old, New))),
-    %% lager:warning("Diff ~p", [Diff]),
+		 lists:filter(
+		   fun({X,X})         -> false;
+		      ({{K,X},{K,Y}}) -> true
+		   end, lists:zip(Old, New))),
     Diff.
-    
-    
-    
+
 
 render_prepared(String, string) -> list_to_binary(String);
 render_prepared(Int,   integer) -> Int;
@@ -117,7 +119,9 @@ render(Enum, {enum, Options}) ->
 
 render_type(uid,      _Env) -> "uuid";
 render_type(string,   _Env) -> "varchar"; 
+render_type(ejson,     Env) -> render_type(string, Env);
 render_type(integer,  _Env) -> "int";
+render_type(boolean,  _Env) -> "boolean";
 render_type({enum, _}, Env) -> render_type(string, Env);
 render_type({ref, Of}, Env) -> render_type(i:get([Of, attributes, id], Env), Env);
 render_type({set, Of}, Env) -> ["set<", render_type(Of, Env),">"].
@@ -140,6 +144,8 @@ compile_schema_attribute({Var, Type}, Env) ->
 
 compile_schema_attribute_type(string   , _Env) -> string; 
 compile_schema_attribute_type(integer  , _Env) -> integer; 
+compile_schema_attribute_type(boolean  , _Env) -> boolean; 
+compile_schema_attribute_type(ejson    , _Env) -> ejson; 
 compile_schema_attribute_type(pid      , _Env) -> pid;
 compile_schema_attribute_type({enum, Of}, Env) -> {enum, Of}; 
 compile_schema_attribute_type({ref, Of},  Env) -> i:get([Of, attributes, id], Env); 
@@ -155,15 +161,15 @@ syntax_check_node_schema({node, Name, Args}, Env) when is_atom(Name) ->
 
 
 syntax_check_node_args(Args, Env) ->
-    lists:all(fun(Arg) -> syntax_check_node_arg(Arg, Env) end, Args). 
+    lists:all(fun(Arg) ->
+		      syntax_check_node_arg(Arg, Env)
+	      end, Args). 
 
 syntax_check_node_arg_list({ref, Of}, Env) -> lists:member(Of, Env); 
 syntax_check_node_arg_list(string, _Env) -> true;
 syntax_check_node_arg_list(int, _Env) -> true;
 syntax_check_node_arg_list(_, _Env) -> false. 
-					      
 
-    
 syntax_check_node_arg(string, _Env) -> true;
 syntax_check_node_arg({list, Of}, Env) ->  syntax_check_node_arg_list(Of, Env);
 syntax_check_node_arg(Type, _Env) -> 
