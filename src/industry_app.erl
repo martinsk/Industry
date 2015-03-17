@@ -26,9 +26,6 @@ start() ->  application:start(industry).
 start(_StartType, _StartArgs) ->
     lager:warning("Starting App"),
 
-    ok = application:start(ranch),
-    ok = application:start(cowlib),
-    ok = application:start(cowboy),
     ok = application:start(druuid),
     ok = application:start(rafter),
     

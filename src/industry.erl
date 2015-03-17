@@ -64,23 +64,23 @@ start_link() ->
 %%                     ignore |
 %%                     {stop, Reason}
 init([]) ->
-    RoutingTable = [
-		    {"/api/",                            industry_inspector,        []},
-		    {"/api/factories/:type",             factory_inspector,         []},
-		    {"/api/factories/:type/worker/:id",  factory_worker_inspector,  []},
-		    {"/[...]", cowboy_static, {priv_dir, industry, "www"}}
-		   ],
+    %% RoutingTable = [
+    %% 		    {"/api/",                            industry_inspector,        []},
+    %% 		    {"/api/factories/:type",             factory_inspector,         []},
+    %% 		    {"/api/factories/:type/worker/:id",  factory_worker_inspector,  []},
+    %% 		    {"/[...]", cowboy_static, {priv_dir, industry, "www"}}
+    %% 		   ],
     
-    Dispatch = cowboy_router:compile([{'_', RoutingTable}]),
+    %% Dispatch = cowboy_router:compile([{'_', RoutingTable}]),
     
-    HostSettings = [{port, 8080}],
-    EnvSettings   = [{env, [{dispatch, Dispatch}]}],
-    Connections  = 100,
+    %% HostSettings = [{port, 8080}],
+    %% EnvSettings   = [{env, [{dispatch, Dispatch}]}],
+    %% Connections  = 100,
     
-    case cowboy:start_http(industry_http_listener, Connections, HostSettings, EnvSettings) of
-	{error, badarg} -> lager:error("unable to initialize cowboy server ~p ~p", [EnvSettings]);
-	_ -> ok
-    end,
+    %% case cowboy:start_http(industry_http_listener, Connections, HostSettings, EnvSettings) of
+    %% 	{error, badarg} -> lager:error("unable to initialize cowboy server ~p ~p", [EnvSettings]);
+    %% 	_ -> ok
+    %% end,
 	
     {ok, #state{}}.
 
