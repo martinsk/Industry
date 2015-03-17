@@ -211,9 +211,9 @@ valid_term(Terms, {list, Type}, Rules) ->
 valid_term([Name | Args] , Rule, Rules) ->
     lists:any(fun({node, Name1, Types}) ->
 		      Name1 =:= Name 
-			  andalso   lists:all(fun({Arg, Type}) ->
-						      valid_term(Arg, Type, Rules)
-					      end, lists:zip(Args,Types))
+			  andalso lists:all(fun({Arg, Type}) ->
+						    valid_term(Arg, Type, Rules)
+					    end, lists:zip(Args,Types))
 	      end, i:get(nodes, Rule)).
 
 
