@@ -52,7 +52,7 @@ schema() ->
 
 -spec new(term()) -> {ok, factory_worker:worker_state()}.
 new(Props) -> 
-    lager:warning("Creating ~p", [Props]), 
+%    lager:warning("Creating ~p", [Props]), 
 
     Defaults = [{hostname, "localhost"},
 		{port,            9042},
@@ -76,6 +76,7 @@ handle_call({insert, Schema, _Id, Values}, _From, State) ->
 
     {Query, Row} = industry_seestar_helper:prepare_insert(NameSpace, Type,
 							  Schema, Values),
+    lager:notice("~p", [Query]),
     {ok, Res} = seestar_session:prepare(Pid, Query),
     QryID     = seestar_result:query_id(Res),
     Types     = seestar_result:types(Res),
@@ -89,6 +90,7 @@ handle_call({select, Schema, Id}, _From, State) ->
 
     Query = industry_seestar_helper:prepare_select(NameSpace, Type,
 						   Schema, Id),
+    lager:notice("~p", [Query]),
     {ok, Rows} = seestar_session:perform(Pid, Query, one),
     Result = case seestar_result:rows(Rows) of
 		 [Row] ->
@@ -102,16 +104,17 @@ handle_call({update, Schema, Id, Values}, _From, State) ->
     NameSpace = i:get(namespace, State),
     Pid       = i:get(pid,       State),
 
-
     Query = industry_seestar_helper:prepare_update(NameSpace, Type,
 						   Schema, Id, Values),
+    lager:notice("~p", [Query]),
     {ok, _} = seestar_session:perform(Pid, Query, one),
     {reply, ok, State};
 handle_call({create_tables, Schemas}, _From, State) ->
     NameSpace = i:get(namespace, State),
     Pid       = i:get(pid,       State),
     Queries = industry_seestar_helper:prepare_create_tables(NameSpace, Schemas),
-    lists:foreach(fun(Query) ->
+    [lager:notice("~p", [Q]) || Q <- Queries], 
+        lists:foreach(fun(Query) ->
 			  seestar_session:perform(Pid, Query, one)
 		  end, Queries),
     {reply,ok, State}.

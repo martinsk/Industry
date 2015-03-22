@@ -93,7 +93,10 @@ state_diff(Schema, OldState, NewState)->
     Diff.
 
 
-render_prepared(String, string) -> list_to_binary(String);
+render_prepared(undefined, _) -> null;
+render_prepared(String, string) -> iolist_to_binary(String);
+render_prepared(Boolean,   boolean) when Boolean == true;
+					 Boolean == false -> Boolean;
 render_prepared(Int,   integer) -> Int;
 render_prepared(Set, {set, Of}) -> sets:from_list([render_prepared(E, Of)
 						   || E <- sets:to_list(Set)]);
@@ -104,8 +107,8 @@ render_prepared(Enum, {enum, Options}) ->
 
 
 render(String, string) -> 
-    lager:warning("render(~p, string) = ~p", [String, ["'", list_to_binary(String),"'"]]),
-    ["'", list_to_binary(String),"'"];
+    lager:warning("render(~p, string) = ~p", [String, ["'", iolist_to_binary(String),"'"]]),
+    ["'", iolist_to_binary(String),"'"];
 render(Int, integer) -> io_lib:format("~p", [Int]); 
 render(Set, {set, Of}) -> ["{", 
 			   string:join([render(E, Of) 

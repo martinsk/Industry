@@ -17,7 +17,6 @@ go() ->
     DBWorkerSchema  = db_worker:schema(),
     industry:add_factory(DBWorkerSchema),
 
-
     OrganizationSchema = organization:schema(),
     ResourceSchema     = resource:schema(),
     ApiKeySchema       = api_key:schema(),
@@ -39,7 +38,7 @@ go() ->
 
     {Org, organization} = factory:create(organization, []),
 
-    Account1Spec = [{first_name,"James"},{last_name,"Dean"}, {organization, Org}],
+    Account1Spec = [{first_name,"Nate"},{last_name,"Buelton"}, {organization, Org}],
     Account2Spec = [{first_name,"Pete"} ,{last_name,"Pony"}, {organization, Org}],
     
     Account1 = {A, account} = factory:create(account, Account1Spec),
@@ -49,20 +48,15 @@ go() ->
     [account:add_resource(Account1) || _X  <- lists:seq(1,1)],
     [account:add_resource(Account2) || _X  <- lists:seq(1,1)],
 
-
-
     account:add_resource(Account1), 
-    account:print_state(Account1),
-
-
     account:print_state(Account1),
 
     Keys = account:get_api_keys(Account1),
     [Key | _ ] = sets:to_list(Keys),
     Valid = api_key:validate(Key, "TopSecret"),
     
-    lager:warning("Key = ~p", [Key]), 
-    lager:warning("Valid = ~p", [Valid]), 
+    lager:info("Key = ~p", [Key]), 
+    lager:info("Valid = ~p", [Valid]), 
 
     {Ts, _} = timer:tc(fun() -> 
 			       {MsgId, message} = message:create(A, B, "Hello There"),
@@ -72,9 +66,13 @@ go() ->
 			       message:change_status(MsgId, delivered), 
 			       message:change_status(MsgId, read) 
 		       end),
-    lager:warning("sending a message took ~p us", [Ts]),
+    lager:notice("sending a message took ~p us", [Ts]),
     Ts.
     
+
+
+
+
 
 
 tree() -> 

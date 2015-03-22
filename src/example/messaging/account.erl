@@ -59,6 +59,10 @@ schema() ->
      {timeout, timer:seconds(1)},
      {module, ?MODULE}].
 
+
+%%%===================================================================
+%%% API
+%%%===================================================================
 -spec new(term()) -> {ok, factory_worker:worker_state()}.
 new(Props) -> 
     Resources = {resources, sets:new()}, 
@@ -68,8 +72,7 @@ new(Props) ->
 				 i:get(id, Props)),
     {ok, [Messages, Roster, Resources | Props]}.
 
--spec loaded(factory_worker:worker_state()) -> 
-		    {ok, factory_worker:worker_state()}.
+-spec loaded(factory_worker:worker_state()) -> {ok, factory_worker:worker_state()}.
 loaded(WorkerState) -> {ok, WorkerState}.
 
 
