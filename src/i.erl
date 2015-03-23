@@ -107,8 +107,8 @@ render_prepared(Enum, {enum, Options}) ->
 
 
 render(String, string) -> 
-    lager:warning("render(~p, string) = ~p", [String, ["'", iolist_to_binary(String),"'"]]),
-    ["'", iolist_to_binary(String),"'"];
+    lager:warning("render(~p, string) = ~p", [String, ["'", binary_to_list(iolist_to_binary(String)),"'"]]),
+    ["'", binary_to_list(iolist_to_binary(String)),"'"];
 render(Int, integer) -> io_lib:format("~p", [Int]); 
 render(Set, {set, Of}) -> ["{", 
 			   string:join([render(E, Of) 

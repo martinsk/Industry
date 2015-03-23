@@ -10,6 +10,7 @@
 -export([prepare_insert/4,
 	 prepare_select/4,
 	 prepare_update/5,
+	 prepare_delete/4,
 	 prepare_create_tables/2]).
 
 
@@ -43,6 +44,7 @@ prepare_select(NameSpace, Table, Schema, Id) ->
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
+			    lager:critical("RENDERING ~p with Type of ~p ", [Key, Value]),
 			    KeyType = i:get([attributes, Key], Schema),
 			    RenderedKey = i:render(Value, KeyType),
 			    io_lib:format("~p = ~s", [Key, RenderedKey])
@@ -54,6 +56,15 @@ prepare_update(NameSpace, Table, Schema, Id, Values) ->
 	     io_lib:format(" WHERE id= ~s", [i:render(Id, IdType)]) 
 	    ],
     lists:flatten(Query).
+
+prepare_delete(NameSpace, Table, Schema, Id) -> 
+    Attributes = i:get(attributes, Schema),
+    Query = [
+	     "DELETE FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
+	     " WHERE id=", i:render(Id, i:get([attributes, id], Schema))
+	    ],
+    lists:flatten(Query).
+
 
 prepare_create_tables(NameSpace, Schemas) -> 
     Env = [{Type, Schema} || Schema <- Schemas, begin
@@ -82,19 +93,26 @@ create_table(NameSpace, Schema, Env) ->
 
 
 
-format_row_results(Row, Schema) -> 
-    Tuples = lists:zip(Row, i:get(attributes, Schema)),
-    [{Name, format_element(Value, Type)} || {Value, {Name, Type}} <- Tuples].
+format_row_results(Row, Schema) ->
+    %% io:format("FORMAT ROW ~p ~n ~n", [Row]),
+    Attributes = i:get(attributes, Schema),
+    [begin
+	 Type = i:get(Name, Attributes),
+	 {Name, format_element(Value, Type)}
+     end || {Name, Value} <- Row].
 
 
+format_element(null, _) -> undefined;
 format_element(Value, integer) ->
     Value;
+format_element(Boolean,  boolean) ->
+    (Boolean);
 format_element(Value,  string) ->
     binary_to_list(Value);
 format_element(null, {set, Of}) ->
     sets:new();
 format_element(Value, {enum, Of}) ->
-    list_to_existing_atom(Value);
+    list_to_existing_atom(binary_to_list(Value));
 format_element(Values, {set, Of}) ->
     sets:from_list(lists:map(fun(Value) ->
 		      format_element(Value, Of)
