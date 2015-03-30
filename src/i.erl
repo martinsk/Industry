@@ -106,6 +106,8 @@ render_prepared(Enum, {enum, Options}) ->
     render_prepared(atom_to_list(Enum), string).    
 
 
+render(Boolean, boolean) -> 
+    atom_to_list(Boolean);
 render(String, string) -> 
     lager:warning("render(~p, string) = ~p", [String, ["'", binary_to_list(iolist_to_binary(String)),"'"]]),
     ["'", binary_to_list(iolist_to_binary(String)),"'"];
