@@ -44,7 +44,7 @@ prepare_select(NameSpace, Table, Schema, Id) ->
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
-			    lager:debugl("RENDERING ~p with Type of ~p ", [Key, Value]),
+			    lager:debug("RENDERING ~p with Type of ~p ", [Key, Value]),
 			    KeyType = i_utils:get([attributes, Key], Schema),
 			    RenderedKey = i_utils:render(Value, KeyType),
 			    io_lib:format("~p = ~s", [Key, RenderedKey])
