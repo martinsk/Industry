@@ -44,7 +44,7 @@ prepare_select(NameSpace, Table, Schema, Id) ->
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
-			    lager:critical("RENDERING ~p with Type of ~p ", [Key, Value]),
+			    lager:debugl("RENDERING ~p with Type of ~p ", [Key, Value]),
 			    KeyType = i:get([attributes, Key], Schema),
 			    RenderedKey = i:render(Value, KeyType),
 			    io_lib:format("~p = ~s", [Key, RenderedKey])
@@ -94,7 +94,6 @@ create_table(NameSpace, Schema, Env) ->
 
 
 format_row_results(Row, Schema) ->
-    %% io:format("FORMAT ROW ~p ~n ~n", [Row]),
     Attributes = i:get(attributes, Schema),
     [begin
 	 Type = i:get(Name, Attributes),
@@ -102,7 +101,6 @@ format_row_results(Row, Schema) ->
      end || {Name, Value} <- Row].
 
 
-format_element(null, _) -> undefined;
 format_element(Value, integer) ->
     Value;
 format_element(Boolean,  boolean) ->

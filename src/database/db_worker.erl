@@ -85,8 +85,11 @@ handle_call({insert, Schema, _Id, Values}, _From, State) ->
     {reply, ok, State};
 handle_call({select, Schema, Id}, _From, State) ->
     Type      = i:get(type,      Schema),
+    Attributes= i:get(attributes,Schema),
     NameSpace = i:get(namespace, State),
     Pid       = i:get(pid,       State),
+
+    AttributeNames = [ N || {N, _} <- Attributes],
 
     Query = industry_seestar_helper:prepare_select(NameSpace, Type,
 						   Schema, Id),
@@ -94,7 +97,8 @@ handle_call({select, Schema, Id}, _From, State) ->
     {ok, Rows} = seestar_session:perform(Pid, Query, one),
     Result = case seestar_result:rows(Rows) of
 		 [Row] ->
-		     industry_seestar_helper:format_select_results(Row, Schema);
+		     industry_seestar_helper:format_row_results(lists:zip(AttributeNames, Row), Schema)
+		     ;
 		 [] ->
 		     not_found
 	     end,
