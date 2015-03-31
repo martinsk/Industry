@@ -99,7 +99,7 @@ init([]) ->
 %%                                   {stop, Reason, Reply, State} |
 %%                                   {stop, Reason, State}
 handle_call({add_factories, Schemas}, _From, State) ->
-    CompiledSchemas = i:compile_schemas(Schemas),
+    CompiledSchemas = i_utils:compile_schemas(Schemas),
 
     lager:warning("COMPILED SCHEMAS ~p", [CompiledSchemas]), 
     {Replies, NewFactories} = 
@@ -171,8 +171,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 create_factory(Schema, Factories) ->
-    Name = i:get(name, Schema),
-    Type = i:get(name, Schema),
+    Name = i_utils:get(name, Schema),
+    Type = i_utils:get(name, Schema),
     case sets:is_element(Name, Factories) of
 	false -> 
 	    factory:start(Schema),

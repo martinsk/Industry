@@ -70,7 +70,7 @@ node(Name, Children)      -> {node, Name, Children}.
 get(Key, State) when is_atom(Key) ->
     proplists:get_value(Key, State);
 get(Keys, State) when is_list(Keys) ->
-    lists:foldl(fun i:get/2, State, Keys).
+    lists:foldl(fun i_utils:get/2, State, Keys).
     
 set(Key, Value, State) ->
     [{Key, Value} | State].
