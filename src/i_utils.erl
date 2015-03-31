@@ -109,7 +109,7 @@ render_prepared(Enum, {enum, Options}) ->
 render(Boolean, boolean) -> 
     atom_to_list(Boolean);
 render(String, string) -> 
-    lager:warning("render(~p, string) = ~p", [String, ["'", binary_to_list(iolist_to_binary(String)),"'"]]),
+    lager:debug("render(~p, string) = ~p", [String, ["'", binary_to_list(iolist_to_binary(String)),"'"]]),
     ["'", binary_to_list(iolist_to_binary(String)),"'"];
 render(Int, integer) -> io_lib:format("~p", [Int]); 
 render(Set, {set, Of}) -> ["{", 
@@ -178,7 +178,7 @@ syntax_check_node_arg_list(_, _Env) -> false.
 syntax_check_node_arg(string, _Env) -> true;
 syntax_check_node_arg({list, Of}, Env) ->  syntax_check_node_arg_list(Of, Env);
 syntax_check_node_arg(Type, _Env) -> 
-    lager:warning("unimplemented Type in args ~p ", [Type]),
+    lager:critical("unimplemented Type in args ~p ", [Type]),
     false.
     
 
@@ -291,6 +291,6 @@ translate_into_schema(Name, Grammar) ->
     Ret = [{type, TypeName},
 	   {attributes, [{id, i_utils:integer()}, RuleNames]
 	    ++ RulesTransitions ++ ArgumentAttrbs}],
-    io:format("~p~n", [Ret]),
+    lager:debug("~p", [Ret]),
     
-    io:format("~p~n", [Expected]).
+    lager:debug("~p", [Expected]).
