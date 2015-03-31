@@ -101,10 +101,12 @@ format_row_results(Row, Schema) ->
      end || {Name, Value} <- Row].
 
 
-format_element(Value, integer) ->
+ format_element(Value, integer) ->
     Value;
 format_element(Boolean,  boolean) ->
     (Boolean);
+format_element(null,  string) -> 
+    undefined;
 format_element(Value,  string) ->
     binary_to_list(Value);
 format_element(null, {set, Of}) ->
