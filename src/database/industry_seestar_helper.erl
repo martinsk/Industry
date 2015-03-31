@@ -18,7 +18,7 @@
 
 
 prepare_insert(NameSpace, Table, Schema, Values) ->
-    Attributes = i:get(attributes, Schema),
+    Attributes = i_utils:get(attributes, Schema),
     Query = [
 	     io_lib:format("INSERT INTO ~s.~p", [NameSpace, Table]),
 	     " (", string:join([ io_lib:format("~p", [K]) 
@@ -27,26 +27,26 @@ prepare_insert(NameSpace, Table, Schema, Values) ->
 	    ],
     Row = [ begin
 		Value = proplists:get_value(Attribute, Values),
-		i:render_prepared(Value, AttrType)
+		i_utils:render_prepared(Value, AttrType)
 	    end || {Attribute, AttrType} <- Attributes],
     {lists:flatten(Query), Row}.
 
 
 prepare_select(NameSpace, Table, Schema, Id) -> 
-    Attributes = i:get(attributes, Schema),
+    Attributes = i_utils:get(attributes, Schema),
     Query = [
 	     "SELECT ", string:join([ io_lib:format("~p", [K]) 
 				      || {K,_} <- Attributes], ","),
 	     " FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-	     " WHERE id=", i:render(Id, i:get([attributes, id], Schema))
+	     " WHERE id=", i_utils:render(Id, i_utils:get([attributes, id], Schema))
 	    ],
     lists:flatten(Query).
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
 			    lager:debugl("RENDERING ~p with Type of ~p ", [Key, Value]),
-			    KeyType = i:get([attributes, Key], Schema),
-			    RenderedKey = i:render(Value, KeyType),
+			    KeyType = i_utils:get([attributes, Key], Schema),
+			    RenderedKey = i_utils:render(Value, KeyType),
 			    io_lib:format("~p = ~s", [Key, RenderedKey])
 			end || {Key, Value} <- Values],
     IdType = i_utils:get([attributes, id], Schema), 
