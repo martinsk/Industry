@@ -92,18 +92,19 @@ cast({Id, Type}, Request) ->
 %%                     ignore |
 %%                     {stop, Reason}
 init([new, Props, Schema]) ->
-    Module  = i:get(module,  Schema),
-    Options = i:get(options, Schema),
-    Type    = i:get(type,    Schema),
-    Timeout = i:get(timeout, Schema),
+    Module  = i_utils:get(module,  Schema),
+    Options = i_utils:get(options, Schema),
+    Type    = i_utils:get(type,    Schema),
+    Timeout = i_utils:get(timeout, Schema),
     
     {ok, NewInstanceState} = Module:new(Props),
     {ok, InstanceState}    = Module:loaded(NewInstanceState),
     
-    ok = case i:get(on_create, Options) of
+    ok = case i_utils:get(on_create, Options) of
 	     undefined  -> ok;
 	     Opts ->
-		 Id = i:get(id, NewInstanceState),
+		 Id = i_utils:get(id, NewInstanceState),
+		 lager:notice("Creating  worker for ~p ", [Id]),
 		 lists:foreach(fun({Mod,Fun}) ->
 				       Mod:Fun(Schema,Id, NewInstanceState)
 			       end, Opts)
@@ -120,13 +121,16 @@ init([new, Props, Schema]) ->
 	    {ok, State, Timeout}
     end;
 init([load, Id, Schema]) ->
-    Module  = i:get(module,  Schema),
-    Options = i:get(options, Schema),
-    Type    = i:get(type,    Schema),
-    Timeout = i:get(timeout, Schema),
+
+    lager:notice("Loading up worker for ~p ", [Id]),
+
+    Module  = i_utils:get(module,  Schema),
+    Options = i_utils:get(options, Schema),
+    Type    = i_utils:get(type,    Schema),
+    Timeout = i_utils:get(timeout, Schema),
     
 
-    Props = case i:get(on_load, Options) of
+    Props = case i_utils:get(on_load, Options) of
 	[{Mod,Fun}] ->  Mod:Fun(Schema, Id)
     end,
 	    
@@ -161,8 +165,8 @@ handle_call(Req, From, State = #state{run_state      = shutdown,
 				      instance_state = InstanceState,
 				      schema         = Schema,
 				      timeout        = Timeout}) ->
-    Type    = i:get(type,    Schema),
-    Id      = i:get(id,      InstanceState), 
+    Type    = i_utils:get(type,    Schema),
+    Id      = i_utils:get(id,      InstanceState), 
     Reply = call({Type, Id}, Req),
     finalize(reply, Reply, State, Timeout);
 handle_call({req, Request}, From, #state{instance_state = InstanceState,
@@ -187,8 +191,8 @@ handle_cast(Req, State = #state{instance_state = InstanceState,
 			     schema         = Schema,
 			     run_state      = shutdown,
 			     timeout        = Timeout}) ->
-    Type    = i:get(type,    Schema),
-    Id      = i:get(id,      InstanceState), 
+    Type    = i_utils:get(type,    Schema),
+    Id      = i_utils:get(id,      InstanceState), 
     cast({Type, Id}, Req),
     finalize(noreply, State, Timeout);
 handle_cast({req,Msg}, #state{instance_state = InstanceState, 
@@ -215,8 +219,8 @@ handle_info(timeout, State = #state{run_state = running,
 				 instance_state = InstanceState,
 				 timeout = Timeout,
 				 schema = Schema}) ->
-    Id   = i:get(id, InstanceState),
-    Type = i:get(type, Schema),
+    Id   = i_utils:get(id, InstanceState),
+    Type = i_utils:get(type, Schema),
     factory:unregister({Type, Id}, self()),
     {noreply, State#state{run_state = shutdown}, Timeout};
 handle_info(timeout, State = #state{run_state = shutdown}) ->
@@ -236,7 +240,9 @@ handle_info(Info, #state{instance_state = InstanceState,
 %% @end
 %%--------------------------------------------------------------------
 %% @spec terminate(Reason, State) -> void()
-terminate(normal, _State) ->
+terminate(normal, State = #state{instance_state = InstanceState}) ->
+    lager:notice("shutting down worker for ~p ", [i_utils:get(id, InstanceState)]),
+
     ok.
 
 %%--------------------------------------------------------------------
@@ -256,19 +262,19 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 cleanup_state(State, Schema) ->
-    Attributes = [Attr || {Attr, Type} <- i:get(attributes, Schema)],
-    [{Attr, i:get(Attr, State)} || Attr <- Attributes].
+    Attributes = [Attr || {Attr, Type} <- i_utils:get(attributes, Schema)],
+    [{Attr, i_utils:get(Attr, State)} || Attr <- Attributes].
 
 handle_state_change(Schema, OldState, NewState) ->
-    Diff = i:state_diff(Schema, OldState, NewState),
+    Diff = i_utils:state_diff(Schema, OldState, NewState),
     case Diff of 
 	[] -> ok;
 	Diff ->
 	    lager:warning("Diff ~p ", [Diff]), 
-	    Options = i:get(options, Schema),
-	    Type    = i:get(type,    Schema),
-	    Id      = i:get(id,      OldState), 
-	    case i:get(on_change, Options) of
+	    Options = i_utils:get(options, Schema),
+	    Type    = i_utils:get(type,    Schema),
+	    Id      = i_utils:get(id,      OldState), 
+	    case i_utils:get(on_change, Options) of
 		undefined -> ok;
 		Opts ->
 		    lists:foreach(fun({Mod,Fun}) ->

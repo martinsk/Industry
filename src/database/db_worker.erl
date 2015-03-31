@@ -35,16 +35,16 @@ db_factory_worker_call(Request) ->
     factory_worker:call({WorkerId, ?MODULE}, Request).
 
 attribute_pairs() ->
-    i:list(i:pair(i:string(), i:string())).
+    i_utils:list(i_utils:pair(i_utils:string(), i_utils:string())).
 
 schema() ->
     [{name,    "db_worker"},
      {type,    ?MODULE},
      {attributes, [
-		   {hostname  , i:string()},
-		   {port      , i:integer()},
-		   {namespace , i:string()},
-		   {pid       , i:pid()}
+		   {hostname  , i_utils:string()},
+		   {port      , i_utils:integer()},
+		   {namespace , i_utils:string()},
+		   {pid       , i_utils:pid()}
 		  ]},
      {options, []},
      {timeout, never},
@@ -57,22 +57,22 @@ new(Props) ->
     Defaults = [{hostname, "localhost"},
 		{port,            9042},
 		{namespace, "industry"}],
-    State = i:state(Props, Defaults),
+    State = i_utils:state(Props, Defaults),
     {ok, State}.
 
 -spec loaded(factory_worker:worker_state()) -> 
 		    {ok, factory_worker:worker_state()}.
 loaded(State) -> 
-    Hostname  = i:get(hostname,  State),
-    Port      = i:get(port,      State),
+    Hostname  = i_utils:get(hostname,  State),
+    Port      = i_utils:get(port,      State),
     {ok, Pid} = seestar_session:start_link(Hostname, Port),
-    {ok, i:state(State, [{pid, Pid}])}.
+    {ok, i_utils:state(State, [{pid, Pid}])}.
 
 
 handle_call({insert, Schema, _Id, Values}, _From, State) ->
-    Type      = i:get(type,      Schema),
-    NameSpace = i:get(namespace, State),
-    Pid       = i:get(pid,       State),
+    Type      = i_utils:get(type,      Schema),
+    NameSpace = i_utils:get(namespace, State),
+    Pid       = i_utils:get(pid,       State),
 
     {Query, Row} = industry_seestar_helper:prepare_insert(NameSpace, Type,
 							  Schema, Values),
@@ -84,10 +84,10 @@ handle_call({insert, Schema, _Id, Values}, _From, State) ->
     {ok, _} = seestar_session:execute(Pid, QryID, Types, Row, one),
     {reply, ok, State};
 handle_call({select, Schema, Id}, _From, State) ->
-    Type      = i:get(type,      Schema),
-    Attributes= i:get(attributes,Schema),
-    NameSpace = i:get(namespace, State),
-    Pid       = i:get(pid,       State),
+    Type      = i_utils:get(type,      Schema),
+    Attributes= i_utils:get(attributes,Schema),
+    NameSpace = i_utils:get(namespace, State),
+    Pid       = i_utils:get(pid,       State),
 
     AttributeNames = [ N || {N, _} <- Attributes],
 
@@ -104,9 +104,9 @@ handle_call({select, Schema, Id}, _From, State) ->
 	     end,
     {reply, Result, State}; 
 handle_call({update, Schema, Id, Values}, _From, State) ->
-    Type      = i:get(type,      Schema),
-    NameSpace = i:get(namespace, State),
-    Pid       = i:get(pid,       State),
+    Type      = i_utils:get(type,      Schema),
+    NameSpace = i_utils:get(namespace, State),
+    Pid       = i_utils:get(pid,       State),
 
     Query = industry_seestar_helper:prepare_update(NameSpace, Type,
 						   Schema, Id, Values),
@@ -114,8 +114,8 @@ handle_call({update, Schema, Id, Values}, _From, State) ->
     {ok, _} = seestar_session:perform(Pid, Query, one),
     {reply, ok, State};
 handle_call({create_tables, Schemas}, _From, State) ->
-    NameSpace = i:get(namespace, State),
-    Pid       = i:get(pid,       State),
+    NameSpace = i_utils:get(namespace, State),
+    Pid       = i_utils:get(pid,       State),
     Queries = industry_seestar_helper:prepare_create_tables(NameSpace, Schemas),
     [lager:notice("~p", [Q]) || Q <- Queries], 
         lists:foreach(fun(Query) ->

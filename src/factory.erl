@@ -97,7 +97,7 @@ get_state(Type) ->
 %%                     {stop, Reason}
 init([Schema]) ->
     lager:warning("init factory"),
-    Type = i:get(type, Schema),
+    Type = i_utils:get(type, Schema),
     TRef = ets_new(Type),
     {A, B, C} = now(),
     random:seed(A,B,C),
@@ -119,7 +119,7 @@ init([Schema]) ->
 %%                                   {stop, Reason, Reply, State} |
 %%                                   {stop, Reason, State}
 handle_call(stop_workers, _From, State) ->
-    Type = i:get(type, State#state.schema),
+    Type = i_utils:get(type, State#state.schema),
     TableName = list_to_existing_atom(ets_tname(Type)),
     Workers = ets:tab2list(TableName),
     lists:foreach(fun({Id, _Pid}) ->
@@ -128,7 +128,7 @@ handle_call(stop_workers, _From, State) ->
 		  end, Workers),
     {reply, ok, State};
 handle_call({load, Id}, _From, State) ->
-    Type = i:get(type, State#state.schema),
+    Type = i_utils:get(type, State#state.schema),
     ok = case ets_lookup(Id, Type) of
 	     [{Id, _Pid}] ->  
 		 ok;
@@ -139,8 +139,8 @@ handle_call({load, Id}, _From, State) ->
 	 end,		
     {reply, ok, State};
 handle_call({create, Props}, _From, State) ->
-    Type = i:get(type, State#state.schema),
-    InitProps = case i:get(id, Props) of
+    Type = i_utils:get(type, State#state.schema),
+    InitProps = case i_utils:get(id, Props) of
 		    undefined ->
 			Id = random:uniform(100000000),
 			[{id, Id} | Props];
@@ -164,7 +164,7 @@ handle_call({create, Props}, _From, State) ->
 	    {reply, {error_existt}, State}
     end; 
 handle_call(get_state, _From, State) ->
-    Name = i:get(name, State#state.schema),
+    Name = i_utils:get(name, State#state.schema),
     Workers = [Id || {Id, _Pid} <- dict:to_list(State#state.workers)],
     Reply = [{name, {Name, string}}, [workers, {Workers, {list, string}}]],
     {reply, Reply, State};

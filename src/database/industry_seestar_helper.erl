@@ -49,26 +49,26 @@ prepare_update(NameSpace, Table, Schema, Id, Values) ->
 			    RenderedKey = i:render(Value, KeyType),
 			    io_lib:format("~p = ~s", [Key, RenderedKey])
 			end || {Key, Value} <- Values],
-    IdType = i:get([attributes, id], Schema), 
+    IdType = i_utils:get([attributes, id], Schema), 
     Query = [
 	     io_lib:format("UPDATE ~s.~p", [NameSpace, Table]),
 	     " SET ", string:join(QueryAssignments, ", "),
-	     io_lib:format(" WHERE id= ~s", [i:render(Id, IdType)]) 
+	     io_lib:format(" WHERE id= ~s", [i_utils:render(Id, IdType)]) 
 	    ],
     lists:flatten(Query).
 
 prepare_delete(NameSpace, Table, Schema, Id) -> 
-    Attributes = i:get(attributes, Schema),
+    Attributes = i_utils:get(attributes, Schema),
     Query = [
 	     "DELETE FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-	     " WHERE id=", i:render(Id, i:get([attributes, id], Schema))
+	     " WHERE id=", i_utils:render(Id, i_utils:get([attributes, id], Schema))
 	    ],
     lists:flatten(Query).
 
 
 prepare_create_tables(NameSpace, Schemas) -> 
     Env = [{Type, Schema} || Schema <- Schemas, begin
-						    Type = i:get(type, Schema),
+						    Type = i_utils:get(type, Schema),
 						    true
 						end],
     lists:map(fun(Schema) ->
@@ -76,12 +76,12 @@ prepare_create_tables(NameSpace, Schemas) ->
 	      end, Schemas).
     
 create_table(NameSpace, Schema, Env) ->
-    Attributes = i:get(attributes, Schema),
-    Table      = i:get(type,      Schema),
+    Attributes = i_utils:get(attributes, Schema),
+    Table      = i_utils:get(type,      Schema),
     Query = [
 	     io_lib:format("CREATE TABLE ~s.~p", [NameSpace, Table]),
 	     "(", string:join([begin
-				   RType = i:render_type(Type, Env),
+				   RType = i_utils:render_type(Type, Env),
 				   Primary = case Key of
 						 id -> "PRIMARY KEY ";
 						 _ -> ""
@@ -94,9 +94,9 @@ create_table(NameSpace, Schema, Env) ->
 
 
 format_row_results(Row, Schema) ->
-    Attributes = i:get(attributes, Schema),
+    Attributes = i_utils:get(attributes, Schema),
     [begin
-	 Type = i:get(Name, Attributes),
+	 Type = i_utils:get(Name, Attributes),
 	 {Name, format_element(Value, Type)}
      end || {Name, Value} <- Row].
 

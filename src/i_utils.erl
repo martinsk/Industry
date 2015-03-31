@@ -5,7 +5,7 @@
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
--module(i).
+-module(i_utils).
 
 -export([
 	 uid/0,
@@ -82,9 +82,9 @@ state(State, Defaults) ->
 
 state_diff(_Schema, State, State)-> [];
 state_diff(Schema, OldState, NewState)->
-    Attributes = [ K || {K, _} <- i:get(attributes, Schema)],
-    Old = [ {K, i:get(K, OldState)} || K <- Attributes],
-    New = [ {K, i:get(K, NewState)} || K <- Attributes],
+    Attributes = [ K || {K, _} <- i_utils:get(attributes, Schema)],
+    Old = [ {K, i_utils:get(K, OldState)} || K <- Attributes],
+    New = [ {K, i_utils:get(K, NewState)} || K <- Attributes],
     {_,Diff} = lists:unzip(
 		 lists:filter(
 		   fun({X,X})         -> false;
@@ -128,13 +128,13 @@ render_type(ejson,     Env) -> render_type(string, Env);
 render_type(integer,  _Env) -> "int";
 render_type(boolean,  _Env) -> "boolean";
 render_type({enum, _}, Env) -> render_type(string, Env);
-render_type({ref, Of}, Env) -> render_type(i:get([Of, attributes, id], Env), Env);
+render_type({ref, Of}, Env) -> render_type(i_utils:get([Of, attributes, id], Env), Env);
 render_type({set, Of}, Env) -> ["set<", render_type(Of, Env),">"].
 				    
     
 
 compile_schemas(Schemas) ->
-    Env = [{i:get(type, Schema), Schema} || Schema <- Schemas],
+    Env = [{i_utils:get(type, Schema), Schema} || Schema <- Schemas],
     [compile_schema(Schema, Env) || Schema <- Schemas].
 
 compile_schema(Schema, Env) ->
@@ -153,12 +153,12 @@ compile_schema_attribute_type(boolean  , _Env) -> boolean;
 compile_schema_attribute_type(ejson    , _Env) -> ejson; 
 compile_schema_attribute_type(pid      , _Env) -> pid;
 compile_schema_attribute_type({enum, Of}, Env) -> {enum, Of}; 
-compile_schema_attribute_type({ref, Of},  Env) -> i:get([Of, attributes, id], Env); 
+compile_schema_attribute_type({ref, Of},  Env) -> i_utils:get([Of, attributes, id], Env); 
 compile_schema_attribute_type({set, Of},  Env) -> {set, compile_schema_attribute_type(Of, Env)}. 
     
 
 syntax_check_tree_schema(Schema, Env) ->
-    Nodes = i:get(nodes, Schema),
+    Nodes = i_utils:get(nodes, Schema),
     lists:all(fun(Node) -> syntax_check_node_schema(Node, Env) end, Nodes). 
 
 syntax_check_node_schema({node, Name, Args}, Env) when is_atom(Name) ->
@@ -183,11 +183,11 @@ syntax_check_node_arg(Type, _Env) ->
     
 
 parse_tree_schema(Grammar) ->
-    Root = i:get(root, Grammar),
-    Env = [i:get(name, Rule) || Rule <- i:get(rules, Grammar)],
+    Root = i_utils:get(root, Grammar),
+    Env = [i_utils:get(name, Rule) || Rule <- i_utils:get(rules, Grammar)],
     true = lists:all(fun(Rule) ->
 			     syntax_check_tree_schema(Rule, Env) 
-		     end, i:get(rules, Grammar) ),
+		     end, i_utils:get(rules, Grammar) ),
     
     Term = {'or', [{'memberof', "Somethign"},
 		   {'and', [{present, "shizzle"}]}
@@ -196,9 +196,9 @@ parse_tree_schema(Grammar) ->
     Schema = translate_into_schema('filter', Grammar).
 
 in_language(String, Grammar) ->
-    Root = i:get(root, Grammar),
-    Rules = i:get(rules, Grammar),
-    [RootRule] = [Rule ||Rule <- Rules, Root =:= i:get(name, Rule)],
+    Root = i_utils:get(root, Grammar),
+    Rules = i_utils:get(rules, Grammar),
+    [RootRule] = [Rule ||Rule <- Rules, Root =:= i_utils:get(name, Rule)],
     valid_term(String, RootRule, Rules).
 
 
@@ -207,7 +207,7 @@ valid_term(Tuple, Type, Rules) when is_tuple(Tuple) ->
 valid_term(Str, string, Rules) -> 
     true;
 valid_term(Term, {ref, Type}, Rules) ->
-    [NewRule] = [Rule ||Rule <- Rules, Type =:= i:get(name, Rule)],
+    [NewRule] = [Rule ||Rule <- Rules, Type =:= i_utils:get(name, Rule)],
     valid_term(Term, NewRule, Rules);    
 valid_term(Terms, {list, Type}, Rules) -> 
     lists:all(fun(Term) -> 
@@ -219,13 +219,13 @@ valid_term([Name | Args] , Rule, Rules) ->
 			  andalso lists:all(fun({Arg, Type}) ->
 						    valid_term(Arg, Type, Rules)
 					    end, lists:zip(Args,Types))
-	      end, i:get(nodes, Rule)).
+	      end, i_utils:get(nodes, Rule)).
 
 
 
 
 translate_arg_types({ref, Of}, Grammar, Name) ->
-    Env = [i:get(name,Rule) || Rule <- i:get(rules, Grammar)],
+    Env = [i_utils:get(name,Rule) || Rule <- i_utils:get(rules, Grammar)],
     case lists:member(Of, Env) of
 	true ->
 	    {ref, Name};
@@ -242,7 +242,7 @@ translate_arg_types(Other, _Grammar, _Name) ->
 	
 
 translate_rule_node_into_attributes({node, Transition, ArgTypes}, Rule, Grammar, Name) ->
-    RuleName = i:get(name, Rule),
+    RuleName = i_utils:get(name, Rule),
     RuleNameStr = atom_to_list(RuleName),
     TrName = atom_to_list(Transition),
     lists:map(fun({ArgType, Int}) ->
@@ -257,7 +257,7 @@ translate_rule_into_attributes(Rule, Grammar, Name) ->
     lists:append(
       lists:map(fun(Node) ->
 			translate_rule_node_into_attributes(Node, Rule, Grammar, Name)
-		end, i:get(nodes, Rule))).
+		end, i_utils:get(nodes, Rule))).
     
 
     
@@ -265,31 +265,31 @@ translate_into_schema(Name, Grammar) ->
     TypeName = list_to_atom("grammar_" ++ atom_to_list(Name)),
     Expected = [{type, grammar_filter},
 		{attributes, [
-			      {id,                  i:integer()},
-			      {rules,               i:enum([filter])},
-			      {'_filter',           i:enum(['or', 'and', 'present', 'memberof'])},
-			      {'_filter_or_0',       i:list(i:ref(grammer_filter))},
-			      {'_filter_and_0',      i:list(i:ref(grammer_filter))},
-			      {'_filter_present_0',  i:string()},
-			      {'_filter_memberof_0', i:string()}
+			      {id,                  i_utils:integer()},
+			      {rules,               i_utils:enum([filter])},
+			      {'_filter',           i_utils:enum(['or', 'and', 'present', 'memberof'])},
+			      {'_filter_or_0',       i_utils:list(i_utils:ref(grammer_filter))},
+			      {'_filter_and_0',      i_utils:list(i_utils:ref(grammer_filter))},
+			      {'_filter_present_0',  i_utils:string()},
+			      {'_filter_memberof_0', i_utils:string()}
 			     ]}],
     
-    RuleNames = {rules, i:enum([i:get(name,Rule) || Rule <- i:get(rules, Grammar)])},
+    RuleNames = {rules, i_utils:enum([i_utils:get(name,Rule) || Rule <- i_utils:get(rules, Grammar)])},
     RulesTransitions = lists:map (fun(Rule) ->
-					  RuleName = i:get(name, Rule),
+					  RuleName = i_utils:get(name, Rule),
 					  TName = [ TransitionName 
-						      || {node, TransitionName, _Args} <- i:get(nodes, Rule)],
-					  {list_to_atom("_" ++ atom_to_list(RuleName)), i:enum(TName)}
-				  end, i:get(rules, Grammar)),
+						      || {node, TransitionName, _Args} <- i_utils:get(nodes, Rule)],
+					  {list_to_atom("_" ++ atom_to_list(RuleName)), i_utils:enum(TName)}
+				  end, i_utils:get(rules, Grammar)),
     
     ArgumentAttrbs = lists:append(
 		       lists:map(fun(Rule) ->
 					 translate_rule_into_attributes(Rule, Grammar, TypeName)
-				 end, i:get(rules, Grammar))
+				 end, i_utils:get(rules, Grammar))
 		      ),
     
     Ret = [{type, TypeName},
-	   {attributes, [{id, i:integer()}, RuleNames]
+	   {attributes, [{id, i_utils:integer()}, RuleNames]
 	    ++ RulesTransitions ++ ArgumentAttrbs}],
     io:format("~p~n", [Ret]),
     
