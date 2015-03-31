@@ -101,8 +101,12 @@ format_row_results(Row, Schema) ->
      end || {Name, Value} <- Row].
 
 
- format_element(Value, integer) ->
+format_element(null,  integer) -> 
+    undefined;
+format_element(Value, integer) ->
     Value;
+format_element(null,  boolean) -> 
+    undefined;
 format_element(Boolean,  boolean) ->
     (Boolean);
 format_element(null,  string) -> 
