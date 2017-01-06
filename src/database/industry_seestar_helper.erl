@@ -8,6 +8,7 @@
 -module(industry_seestar_helper).
 
 -export([prepare_insert/4,
+	 prepare_select_secondary_index/4,
 	 prepare_select/4,
 	 prepare_update/5,
 	 prepare_delete/4,
@@ -31,16 +32,27 @@ prepare_insert(NameSpace, Table, Schema, Values) ->
 	    end || {Attribute, AttrType} <- Attributes],
     {lists:flatten(Query), Row}.
 
-
-prepare_select(NameSpace, Table, Schema, Id) -> 
+-spec prepare_select(iolist(), atom(), [term()], iolist()) -> string().
+prepare_select(NameSpace, Table, Schema, WherePL) ->
     Attributes = i_utils:get(attributes, Schema),
     Query = [
 	     "SELECT ", string:join([ io_lib:format("~p", [K]) 
 				      || {K,_} <- Attributes], ","),
 	     " FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-	     " WHERE id=", i_utils:render(Id, i_utils:get([attributes, id], Schema))
+	     " WHERE ", string:join([ io_lib:format("~p=~s", [K,V]) || {K,V} <- WherePL], ",")
 	    ],
     lists:flatten(Query).
+
+-spec prepare_select_secondary_index(iolist(), atom(), [term()], [{atom(), iolist()}]) -> string().
+prepare_select_secondary_index(NameSpace, Table, Schema, WherePL) ->
+	Attributes = i_utils:get(attributes, Schema),
+	Query = [
+		"SELECT ", string:join([ io_lib:format("~p", [K])
+			|| {K,_} <- Attributes], ","),
+		" FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
+		" WHERE ", string:join([ io_lib:format("~p=~s", [K,V]) || {K,V} <- WherePL], ",")
+	],
+	lists:flatten(Query).
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
