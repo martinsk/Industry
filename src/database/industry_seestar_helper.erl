@@ -33,15 +33,15 @@ prepare_insert(NameSpace, Table, Schema, Values) ->
     {lists:flatten(Query), Row}.
 
 -spec prepare_select(iolist(), atom(), [term()], iolist()) -> string().
-prepare_select(NameSpace, Table, Schema, WherePL) ->
-    Attributes = i_utils:get(attributes, Schema),
-    Query = [
-	     "SELECT ", string:join([ io_lib:format("~p", [K]) 
-				      || {K,_} <- Attributes], ","),
-	     " FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-	     " WHERE ", string:join([ io_lib:format("~p=~s", [K,V]) || {K,V} <- WherePL], ",")
-	    ],
-    lists:flatten(Query).
+prepare_select(NameSpace, Table, Schema, Id) ->
+	Attributes = i_utils:get(attributes, Schema),
+	Query = [
+		"SELECT ", string:join([io_lib:format("~p", [K])
+			|| {K, _} <- Attributes], ","),
+		" FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
+		" WHERE id=", i_utils:render(Id, i_utils:get([attributes, id], Schema))
+	],
+	lists:flatten(Query).
 
 -spec prepare_select_secondary_index(iolist(), atom(), [term()], [{atom(), iolist()}]) -> string().
 prepare_select_secondary_index(NameSpace, Table, Schema, WherePL) ->
@@ -50,7 +50,7 @@ prepare_select_secondary_index(NameSpace, Table, Schema, WherePL) ->
 		"SELECT ", string:join([ io_lib:format("~p", [K])
 			|| {K,_} <- Attributes], ","),
 		" FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-		" WHERE ", string:join([ io_lib:format("~p=~s", [K,V]) || {K,V} <- WherePL], ",")
+		" WHERE ", string:join([ io_lib:format("~s=~s", [K, i_utils:render(V, i_utils:get([attributes, K], Schema))]) || {K,V} <- WherePL], " AND ")
 	],
 	lists:flatten(Query).
     
