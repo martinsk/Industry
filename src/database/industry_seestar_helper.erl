@@ -44,13 +44,13 @@ prepare_select(NameSpace, Table, Schema, Id) ->
 	lists:flatten(Query).
 
 -spec prepare_select_secondary_index(iolist(), atom(), [term()], [{atom(), iolist()}]) -> string().
-prepare_select_secondary_index(NameSpace, Table, Schema, WherePL) ->
+prepare_select_secondary_index(NameSpace, Table, Schema, {K,V}) ->
 	Attributes = i_utils:get(attributes, Schema),
 	Query = [
 		"SELECT ", string:join([ io_lib:format("~p", [K])
 			|| {K,_} <- Attributes], ","),
 		" FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-		" WHERE ", string:join([ io_lib:format("~s=~s", [K, i_utils:render(V, i_utils:get([attributes, K], Schema))]) || {K,V} <- WherePL], " AND ")
+		" WHERE ", io_lib:format("~s=~s", [K, i_utils:render(V, i_utils:get([attributes, K], Schema))])
 	],
 	lists:flatten(Query).
     
