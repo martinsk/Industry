@@ -33,8 +33,6 @@ prepare_insert(NameSpace, Table, Schema, Values) ->
     {lists:flatten(Query), Row}.
 
 -spec prepare_select(iolist(), atom(), [term()], iolist() | [{atom(), iolist()}]) -> string().
-prepare_select(NameSpace, Table, Schema, Id) ->
-	prepare_select(NameSpace, Table, Schema, {id, Id});
 prepare_select(NameSpace, Table, Schema, {K,V}) ->
 	Attributes = i_utils:get(attributes, Schema),
 	Query = [
@@ -43,7 +41,9 @@ prepare_select(NameSpace, Table, Schema, {K,V}) ->
 		" FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
 		" WHERE ", io_lib:format("~s=~s", [K, i_utils:render(V, i_utils:get([attributes, K], Schema))])
 	],
-	lists:flatten(Query).
+	lists:flatten(Query);
+prepare_select(NameSpace, Table, Schema, Id) when is_list(Id); is_binary(Id) ->
+	prepare_select(NameSpace, Table, Schema, {id, Id}).
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
@@ -99,7 +99,11 @@ prepare_secondary_index(NameSpace, Schema, Attribute) ->
 	Attributes = i_utils:get(attributes, Schema),
 	Table      = i_utils:get(type, Schema),
 	true       = proplists:is_defined(Attribute, Attributes),
-	io_lib:format("CREATE INDEX ON ~s.~p ( ~p )", [NameSpace, Table, Attribute]).
+	Query = [
+		io_lib:format("CREATE INDEX ON ~s.~p ( ~p )",
+			[NameSpace, Table, Attribute])
+	],
+	lists:flatten(Query).
 
 format_row_results(Row, Schema) ->
     Attributes = i_utils:get(attributes, Schema),
