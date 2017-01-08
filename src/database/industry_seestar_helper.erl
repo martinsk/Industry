@@ -11,7 +11,8 @@
 	 prepare_select/4,
 	 prepare_update/5,
 	 prepare_delete/4,
-	 prepare_create_tables/2]).
+	 prepare_create_tables/2,
+	 prepare_secondary_index/3]).
 
 
 -export([format_row_results/2]).
@@ -31,16 +32,18 @@ prepare_insert(NameSpace, Table, Schema, Values) ->
 	    end || {Attribute, AttrType} <- Attributes],
     {lists:flatten(Query), Row}.
 
-
-prepare_select(NameSpace, Table, Schema, Id) -> 
-    Attributes = i_utils:get(attributes, Schema),
-    Query = [
-	     "SELECT ", string:join([ io_lib:format("~p", [K]) 
-				      || {K,_} <- Attributes], ","),
-	     " FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
-	     " WHERE id=", i_utils:render(Id, i_utils:get([attributes, id], Schema))
-	    ],
-    lists:flatten(Query).
+-spec prepare_select(iolist(), atom(), [term()], iolist() | [{atom(), iolist()}]) -> string().
+prepare_select(NameSpace, Table, Schema, {K,V}) ->
+	Attributes = i_utils:get(attributes, Schema),
+	Query = [
+		"SELECT ", string:join([ io_lib:format("~p", [K])
+			|| {K,_} <- Attributes], ","),
+		" FROM ", io_lib:format("~s.~p", [NameSpace, Table]),
+		" WHERE ", io_lib:format("~s=~s", [K, i_utils:render(V, i_utils:get([attributes, K], Schema))])
+	],
+	lists:flatten(Query);
+prepare_select(NameSpace, Table, Schema, Id) when is_list(Id); is_binary(Id) ->
+	prepare_select(NameSpace, Table, Schema, {id, Id}).
     
 prepare_update(NameSpace, Table, Schema, Id, Values) ->
     QueryAssignments = [begin
@@ -91,7 +94,16 @@ create_table(NameSpace, Schema, Env) ->
 	     ")"],
     lists:flatten(Query).
 
-
+-spec prepare_secondary_index(iolist(), [term()], atom()) -> string().
+prepare_secondary_index(NameSpace, Schema, Attribute) ->
+	Attributes = i_utils:get(attributes, Schema),
+	Table      = i_utils:get(type, Schema),
+	true       = proplists:is_defined(Attribute, Attributes),
+	Query = [
+		io_lib:format("CREATE INDEX ON ~s.~p ( ~p )",
+			[NameSpace, Table, Attribute])
+	],
+	lists:flatten(Query).
 
 format_row_results(Row, Schema) ->
     Attributes = i_utils:get(attributes, Schema),

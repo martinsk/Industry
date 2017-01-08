@@ -15,3 +15,7 @@ searches for large collections of entities.
 
 
 ## The inspecter service
+
+## Test
+
+  $ `rebar3 eunit`
